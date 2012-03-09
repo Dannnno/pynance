@@ -81,20 +81,26 @@ def print_portfolio(portData):
 		print "    {}  = {}".format(k, v)
 
 def get_portfolios(user):
+	""" Retrieve a list of all of a user's portfolios. Print them out,
+		giving short summaries of each, and store this data to the user
+		dict that is being passed around this program. """
+
 	reqstr = "https://finance.google.com/finance/feeds/default/portfolios?alt=json"
 	if not user or not user['Auth']:
 		print "Not authenticated!"
 		return
+	
 	r = requests.get(reqstr, headers=user['headers'])
-	print "Status code: %d" % r.status_code
 	resp_data = json.loads(r.content)
 	feed = resp_data['feed']
 	entries = feed['entry']
+	
 	for entry in entries:
 		#print json.dumps(entry, sort_keys=True, indent=4)
 		portData = make_port_from_entry(entry)
 		user['portfolios'][portData['title']] = portData
 		print_portfolio(portData)
+	
 	return user
 
 def session():
@@ -102,7 +108,7 @@ def session():
 		"Email" : raw_input("Email > "),
 		"Passwd" : getpass("Password > "),
 		"service" : "finance",
-		"source" : "downsEllis-autoStock-1.0",
+		"source" : "downsEllisTrainer-autoStock-1.0",
 		"Auth" : None,
 		"portfolios" : {},
 		"headers" : {
@@ -127,6 +133,7 @@ def session():
 	for port_title in user['portfolios'].keys():
 		if port_title != "My Portfolio":
 			user = delete_portfolio(user, port_title)
+	user = get_portfolios(user)
 
 if __name__=="__main__":
 	session()

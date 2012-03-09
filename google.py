@@ -76,6 +76,7 @@ def make_port_from_entry(entry):
 	return portData
 
 def print_portfolio(portData):
+	""" Given a portfolio dict, print it out nice and pretty."""
 	print "{}:\n  Last Updated: {}\n  Link to feed: {}".format(portData['title'], portData['updated'], portData['link'])
 	for k, v in portData['portfolioData'].iteritems():
 		print "    {}  = {}".format(k, v)

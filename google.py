@@ -70,7 +70,8 @@ def make_port_from_entry(entry):
 		'etag' : entry['gd$etag'],
 		'link' : entry['link'][1]['href'],
 		'feedLink' : entry['gd$feedLink']['href'],
-		'portfolioData' : {}
+		'portfolioData' : {},
+		'positions' : {}
 	}
 	portData['portfolioData'].update(entry['gf$portfolioData'])
 	for key in portData['portfolioData']:
@@ -82,7 +83,7 @@ def print_portfolio(portData):
 	""" Given a portfolio dict, print it out nice and pretty."""
 	print "{}:\n  Last Updated: {}\n  Link to feed: {}".format(portData['title'], portData['updated'], portData['link'])
 	for k, v in portData['portfolioData'].iteritems():
-		print "    {}  = {}".format(k, v)
+		print "    {} = {}".format(k, v)
 
 def get_portfolios(user):
 	""" Retrieve a list of all of a user's portfolios. Print them out,
@@ -104,8 +105,55 @@ def get_portfolios(user):
 		portData = make_port_from_entry(entry)
 		user['portfolios'][portData['title']] = portData
 		print_portfolio(portData)
-	
 	return user
+
+def make_pos_from_entry(entry):
+	""" Given a JSON position entry, create a position dict"""
+	posData = {
+		'id' : entry['id']['$t'],
+		'updated' : entry['updated']['$t'],
+		'title' : entry['title']['$t'],
+		'link' : entry['link'][0]['href'],
+		'feedLink' : entry['gd$feedLink']['href'],
+		'symbol' : entry['gf$symbol']['symbol'],
+		'exchange': entry['gf$symbol']['exchange'],
+		'fullName' : entry['gf$symbol']['fullName'],
+		'positionData' : {},
+		'transactions' : {}
+	}
+	posData['positionData'].update(entry['gf$positionData'])
+	for key in posData['positionData']:
+		posData['positionData'][key] = float(posData['positionData'][key])
+	return posData
+
+def print_position(posData):
+	""" Given a position, pretty-print it."""
+	print "{}:{} - {}".format(posData['exchange'], posData['symbol'], posData['title'])
+	print "  Last Updated:", posData['updated']
+	print "  Link to feed:", posData['feedLink']
+	for k, v in posData['positionData'].iteritems():
+		print "    {} = {}".format(k, v)
+
+def view_positions(user, port_title):
+	""" Get all of the current positions of a given portfolio"""
+	if not port_title in user['portfolios']:
+		print "Portfolio '{}' does not exist".format(port_title)
+	pos_str = "{}?alt=json".format(user['portfolios'][port_title]['feedLink'])
+	r = requests.get(pos_str, headers=user['headers'])
+	if r.status_code != 200:
+		print "serious error here: r.status_code = {}".format(r.status_code)
+		print "This is clearly not working, goodbye"
+		return user
+	pos_resp = json.loads(r.content)
+	feed = pos_resp['feed']
+	entries = feed['entry']
+	for entry in entries:
+		posData = make_pos_from_entry(entry)
+		user['portfolios'][port_title]['positions'][posData['title']] = posData
+		print_position(posData)
+	return user
+
+
 
 def session():
 	user = {
@@ -138,6 +186,8 @@ def session():
 		if port_title != "My Portfolio":
 			user = delete_portfolio(user, port_title)
 	user = get_portfolios(user)
+	for port_title in user['portfolios']:
+		view_positions(user, port_title)
 
 if __name__=="__main__":
 	session()

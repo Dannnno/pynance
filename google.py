@@ -1,4 +1,5 @@
 import requests
+import json
 from getpass import getpass
 
 def login(user):
@@ -20,18 +21,34 @@ def login(user):
 		user["headers"]["Authorization"] = ("GoogleLogin auth="+Auth)
 	return user
 
-def show_all_portfolios(args, __user=None):
-	reqstr = "https://finance.google.com/finance/feeds/default/portfolios"
+def get_portfolios(__user):
+	reqstr = "https://finance.google.com/finance/feeds/default/portfolios?alt=json"
 	if not __user:
 		print "Not authenticated!"
 	r = requests.get(reqstr, headers=__user['headers'])
 	print "Status code: %d" % r.status_code
-	print r.content
+	resp_data = json.loads(r.content)
+	feed = resp_data['feed']
+	entries = feed['entry']
+	for entry in entries:
+		feedData = {
+			'title' : entry['title']['$t'],
+			'etag' : entry['gd$etag'],
+			'link' : entry['link'][1]['href'],
+			'feedLink' : entry['gd$feedLink']['href'],
+			'portfolioData' : {}
+		}
+		feedData['portfolioData'].update(entry['gf$portfolioData'])
+		for key in feedData['portfolioData']:
+			if key != "currencyCode":
+				feedData['portfolioData'][key] = float(feedData['portfolioData'][key])
+		print feedData
+
 
 def session():
 	""" Starts an interactive sesion """
 	__COMS = {
-		"show_all_ports" : show_all_portfolios
+		"show_all_ports" : get_portfolios
 	}
 	user = {
 		"Email" : raw_input("Email > "),
@@ -52,8 +69,10 @@ def session():
 	else:
 		print "... success."
 		print "Waiting for commands."
+	
+	get_portfolios(user)
 
-	while 1:
+	while 0:
 		user_input = raw_input("> ")
 		print "received \"{}\"".format(user_input)
 

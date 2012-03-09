@@ -15,15 +15,25 @@ def parse_portfolio(entry):
 		'portfolioData' : {},
 		'positions' : {}
 	}
-	portfolio['portfolioData'].update(entry['gf$portfolioData'])
-	for key in portfolio['portfolioData']:
-		if key != "currencyCode":
-			portfolio['portfolioData'][key] = float(portfolio['portfolioData'][key])
-	#print json.dumps(portfolio, sort_keys=True, indent=4)
+	
+	pred = lambda x: x[0:3]=="gf$"
+	for measurement in filter(pred, entry['gf$portfolioData']):
+		print "New Measurement: {}".format(measurement)
+		list_of_values = entry['gf$portfolioData'][measurement]['gd$money']
+		mod_list = []
+		for value in list_of_values:
+			subdict = value
+			subdict['amount'] = float(subdict['amount'])
+			mod_list.append(subdict)
+		portfolio['portfolioData'][measurement[3:]] = mod_list
+		print "portfolio['portfolioData'][{}] = {}".format(measurement[3:], mod_list)
+	
+	for key, value in entry['gf$portfolioData'].iteritems():
+		if key != "currencyCode" and not pred(key):
+			portfolio['portfolioData'].update({key : float(value)})
 	return portfolio
 def print_portfolio(portData):
 	""" Given a portfolio dict, print it out nice and pretty."""
-	#print json.dumps(portData, sort_keys=True, indent=4)
 	print "{}:\n  Last Updated: {}\n  Link to feed: {}".format(portData['title'], portData['updated'], portData['link'])
 	for k, v in portData['portfolioData'].iteritems():
 		print "    {} = {}".format(k, v)
@@ -102,7 +112,7 @@ class FinanceSession():
 			print "Not authenticated!"
 			return False
 
-		target = "https://finance.google.com/finance/feeds/default/portfolios?alt=json"
+		target = "https://finance.google.com/finance/feeds/default/portfolios?returns=true&alt=json"
 		response = requests.get(target, headers=self.headers)
 		if not response.status_code == 200:
 			print "Error! Response status code = {}".format(response.status_code)
@@ -112,6 +122,7 @@ class FinanceSession():
 			feed = resp_data['feed']
 			entries = feed['entry']
 			for entry in entries:
+				print json.dumps(entry, sort_keys=True, indent=4)
 				port = parse_portfolio(entry)
 				self.portfolios[port['title']] = port
 			return True
@@ -162,7 +173,6 @@ class FinanceSession():
 		new_portfolio = parse_portfolio(resp_data['entry'])
 		self.portfolios[new_portfolio['title']] = new_portfolio
 		print "Created new portfolio: {} (currency: {})".format(title, cc)
-		#print_portfolio(new_portfolio)
 		return True
 	
 	def delete_portfolio(self, title):
@@ -198,6 +208,8 @@ class FinanceSession():
 			if r.status_code == 200:
 				pos_resp = json.loads(r.content)
 				feed = pos_resp['feed']
+				if  not 'entry' in feed:
+					return True
 				entries = feed['entry']
 				for entry in entries:
 					position = parse_position(entry)
@@ -227,6 +239,8 @@ class FinanceSession():
 		for title, pos in self.portfolios[port_title]['positions'].iteritems():
 			print_position(pos)
 		print "-----------"
+
+	def get_position_data(self, port_title, key_to_match):pass
 
 def test_session():
 	fs = FinanceSession(raw_input("Email: "), getpass("Password: "))

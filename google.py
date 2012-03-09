@@ -22,6 +22,7 @@ def login(user):
 	return user
 
 def make_portfolio(user, title, currencyCode):
+	""" Create a new portfolio with a given title and currency. """
 	port_str = "<entry xmlns='http://www.w3.org/2005/Atom' "\
 					"xmlns:gf='http://schemas.google.com/finance/2007'> "\
 		  			"<title>{}</title> "\
@@ -47,6 +48,8 @@ def make_portfolio(user, title, currencyCode):
 	return user
 
 def delete_portfolio(user, title):
+	""" Delete a portfolio given its title. If the portfolio doesn't exist,
+		show an error message and then continue anyway."""
 	if title in user['portfolios']:
 		r = requests.delete(user['portfolios'][title]['link'], headers=user['headers'])
 		if r.status_code == 200:

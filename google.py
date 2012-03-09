@@ -125,6 +125,25 @@ class FinanceSession():
 		print "Created new portfolio: {} (currency: {})".format(title, cc)
 		#print_portfolio(new_portfolio)
 		return True
+	def delete_portfolio(self, title):
+		""" If a portfolio with the given title currently exists: delete it. """
+		if title in self.portfolios:
+			r = requests.delete(self.portfolios[title]['link'], headers=self.headers)
+			if r.status_code == 200:
+				print "Successfully deleted portfolio: '{}'".format(title)
+				del self.portfolios[title]
+				return True
+			else:
+				print "Unable to delete portfolio '{}' due to a request or server error.".format(title)
+				print "Status code: {}\nServer resp: {}\n".format(r.status_code, r.content)
+			else:
+		else:
+			print "Portfolio '{}' does not exist.".format(title)
+			print "Deletion failed."
+		
+		return False
+
+
 		
 
 

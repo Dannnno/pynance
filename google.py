@@ -201,7 +201,7 @@ class FinanceSession():
 	
 	def show_positions(self, port_title):
 		""" For a given portfolio, show all of the positions held within it. """
-		if not self.portfolios[port_title]
+		if not self.portfolios[port_title]:
 			print "Portfolio '{}' does not exist.".format(port_title)
 			return False
 		if not self.portfolios[port_title]['positions']:

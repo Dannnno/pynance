@@ -20,6 +20,11 @@ def parse_portfolio(entry):
 		if key != "currencyCode":
 			portfolio['portfolioData'][key] = float(portfolio['portfolioData'][key])
 	return portfolio
+def print_portfolio(portData):
+	""" Given a portfolio dict, print it out nice and pretty."""
+	print "{}:\n  Last Updated: {}\n  Link to feed: {}".format(portData['title'], portData['updated'], portData['link'])
+	for k, v in portData['portfolioData'].iteritems():
+		print "    {} = {}".format(k, v)
 
 def parse_position(entry):
 	""" Given a blob of JSON data (as a dict) that descibres a position,
@@ -40,6 +45,14 @@ def parse_position(entry):
 	for key in position['positionData']:
 		position['positionData'][key] = float(position['positionData'][key])
 	return position
+def print_position(posData):
+	""" Given a position, pretty-print it."""
+	print "{}:{} - {}".format(posData['exchange'], posData['symbol'], posData['title'])
+	print "  Last Updated:", posData['updated']
+	print "  Link to feed:", posData['feedLink']
+	for k, v in posData['positionData'].iteritems():
+		print "    {} = {}".format(k, v)
+
 
 class FinanceSession():
 	def __init__(self, username, password):
@@ -185,6 +198,22 @@ class FinanceSession():
 			print "Portfolio '{}' does not exist.".format(title)
 			print "Unable to fetch positions for nonexistent portfolio"
 		return False
+	
+	def show_positions(self, port_title):
+		""" For a given portfolio, show all of the positions held within it. """
+		if not self.portfolios[port_title]
+			print "Portfolio '{}' does not exist.".format(port_title)
+			return False
+		if not self.portfolios[port_title]['positions']:
+			self.get_positions(port_title)
+		
+		for pos in self.portfolios[port_title]['positions']:
+			print "Portfolio: {}".format(port_title)
+			print "Positions:"
+			print "-----------"
+			for p in self.portfolios:
+				print_position(p)
+			print "-----------"
 
 
 def login(user):
@@ -264,12 +293,6 @@ def make_port_from_entry(entry):
 			portData['portfolioData'][key] = float(portData['portfolioData'][key])
 	return portData
 
-def print_portfolio(portData):
-	""" Given a portfolio dict, print it out nice and pretty."""
-	print "{}:\n  Last Updated: {}\n  Link to feed: {}".format(portData['title'], portData['updated'], portData['link'])
-	for k, v in portData['portfolioData'].iteritems():
-		print "    {} = {}".format(k, v)
-
 def get_portfolios(user):
 	""" Retrieve a list of all of a user's portfolios. Print them out,
 		giving short summaries of each, and store this data to the user
@@ -310,14 +333,6 @@ def make_pos_from_entry(entry):
 	for key in posData['positionData']:
 		posData['positionData'][key] = float(posData['positionData'][key])
 	return posData
-
-def print_position(posData):
-	""" Given a position, pretty-print it."""
-	print "{}:{} - {}".format(posData['exchange'], posData['symbol'], posData['title'])
-	print "  Last Updated:", posData['updated']
-	print "  Link to feed:", posData['feedLink']
-	for k, v in posData['positionData'].iteritems():
-		print "    {} = {}".format(k, v)
 
 def view_positions(user, port_title):
 	""" Get all of the current positions of a given portfolio"""

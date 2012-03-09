@@ -15,7 +15,7 @@ def parse_portfolio(entry):
 		'portfolioData' : {},
 		'positions' : {}
 	}
-	
+	# Gets extra portfolio data that are stored as specific gf$NAME entries
 	pred = lambda x: x[0:3]=="gf$"
 	for measurement in filter(pred, entry['gf$portfolioData']):
 		print "New Measurement: {}".format(measurement)
@@ -26,12 +26,12 @@ def parse_portfolio(entry):
 			subdict['amount'] = float(subdict['amount'])
 			mod_list.append(subdict)
 		portfolio['portfolioData'][measurement[3:]] = mod_list
-		print "portfolio['portfolioData'][{}] = {}".format(measurement[3:], mod_list)
-	
+	# Build the standard portfolio data
 	for key, value in entry['gf$portfolioData'].iteritems():
 		if key != "currencyCode" and not pred(key):
 			portfolio['portfolioData'].update({key : float(value)})
 	return portfolio
+
 def print_portfolio(portData):
 	""" Given a portfolio dict, print it out nice and pretty."""
 	print "{}:\n  Last Updated: {}\n  Link to feed: {}".format(portData['title'], portData['updated'], portData['link'])
@@ -62,6 +62,7 @@ def print_position(posData):
 	print "{}:{} - {}".format(posData['exchange'], posData['symbol'], posData['title'])
 	print "  Last Updated:", posData['updated']
 	print "  Link to feed:", posData['feedLink']
+	print "  Link:", posData['link']
 	for k, v in posData['positionData'].iteritems():
 		print "    {} = {}".format(k, v)
 
@@ -200,7 +201,6 @@ class FinanceSession():
 		if not self.Auth:
 			print "Not authenticated!"
 			return False
-
 		if port_title in self.portfolios:
 			pf = self.portfolios[port_title]
 			target = "{}?alt=json".format(pf['feedLink'])
@@ -213,7 +213,7 @@ class FinanceSession():
 				entries = feed['entry']
 				for entry in entries:
 					position = parse_position(entry)
-					pf['positions'][position['title']] = position
+					pf['positions'][position['symbol']] = position
 					self.portfolios[port_title] = pf # unnecessary? not sure if pf is a reference or copy
 				#TODO: print success?
 				return True
@@ -221,7 +221,7 @@ class FinanceSession():
 				print "Unable to fetch positions for portfolio '{}'".format(port_title)
 				print "Status code: {}\nServer resp: {}".format(r.status_code, r.content)
 		else:
-			print "Portfolio '{}' does not exist.".format(title)
+			print "Portfolio '{}' does not exist.".format(port_title)
 			print "Unable to fetch positions for nonexistent portfolio"
 		return False
 	
@@ -240,20 +240,61 @@ class FinanceSession():
 			print_position(pos)
 		print "-----------"
 
-	def get_position_data(self, port_title, key_to_match):pass
+	def get_position_data(self, port_title, symbol, exchange=None ):
+		""" Gets data associated with a specific position in a given portfolio.
+			You must specify a symbol: e.g., 'AAPL' or 'NASDAQ:AAPL'. If preferred,
+			the exchange can be passed as its own argument: symbol='AAPL', exchange='NASDAQ'
+			. Do not pass the exchange within the symbol AND as its own argument. """
+		if not self.Auth:
+			print "Not authenticated!"
+			return False
+		if not port_title in self.portfolios:
+			print "Portfolio '{}' does not exist.".format(port_title)
+			print "Unable to fetch positions for nonexistent portfolio"
+			return False
+		symbol = symbol.upper()
+		if exchange:
+			exchange = exchange.upper()
+			matched_pos = [(name, data) for name, data in self.portfolios[port_title]['positions'].iteritems() if symbol == data['symbol'] and exchange == data['exchange']]
+		else:
+			matched_pos = [(name, data) for name, data in self.portfolios[port_title]['positions'].iteritems() if symbol == data['symbol']]
+		matched_pos = dict(matched_pos)
+	
+		print "{} positions found for symbol {} on {} exchange".format(len(matched_pos), symbol, exchange if exchange else "any")
+		for pos in matched_pos.itervalues():
+			print_position(pos)
+		return True
+
+				
+
+
+
+
+
+
 
 def test_session():
 	fs = FinanceSession(raw_input("Email: "), getpass("Password: "))
 	fs.get_portfolios()
 	fs.show_portfolios()
+	
 	import time
 	p_name = "Testing (FS) "+str(time.time())
 	fs.create_portfolio(p_name, "USD")
+	
 	fs.show_portfolios()
-	fs.delete_portfolio(p_name)
 	for pf in fs.portfolios:
 		fs.show_positions(pf)
+	fs.get_position_data('My Portfolio', 'AAPL')
+	fs.get_position_data('My Portfolio', 'AAPL', exchange='NASDAQ')
+	fs.get_position_data('My Portfolio', 'GOOG')
 	
+	# cleanup
+	for pf in fs.portfolios.keys():
+		if pf != 'My Portfolio':
+			fs.delete_portfolio(pf)
+
+	#print json.dumps(fs.portfolios, indent=4, sort_keys=True)
 	print "................"
 	print "Done."
 

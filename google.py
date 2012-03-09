@@ -53,7 +53,7 @@ def delete_portfolio(user, title):
 			print "Successfully deleted portfolio: {}".format(title)
 			del user['portfolios'][title]
 		else:
-			print "Wasn't able to delete due to some auth/header error, probably. Idk."
+			print "Wasn't able to delete '{}' due to some auth/header error, probably. Idk.".format(title)
 	else: print "Unable to successfully delete portfolio: {}".format(title)
 	return user
 
@@ -124,7 +124,7 @@ def session():
 	p_name = "Testing_"+str(time.time())
 	user = make_portfolio(user, p_name, "USD")
 	user = delete_portfolio(user, p_name)
-	for port_title in user['portfolios']:
+	for port_title in user['portfolios'].keys():
 		if port_title != "My Portfolio":
 			user = delete_portfolio(user, port_title)
 

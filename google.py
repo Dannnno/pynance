@@ -51,9 +51,11 @@ def delete_portfolio(user, title):
 		r = requests.delete(user['portfolios'][title]['link'], headers=user['headers'])
 		if r.status_code == 200:
 			print "Successfully deleted portfolio: {}".format(title)
+			del user['portfolios'][title]
 		else:
 			print "Wasn't able to delete due to some auth/header error, probably. Idk."
 	else: print "Unable to successfully delete portfolio: {}".format(title)
+	return user
 
 def make_port_from_entry(entry):
 	"""Given a JSON entry from the google API, create a portfolio object"""
@@ -96,10 +98,6 @@ def get_portfolios(user):
 	return user
 
 def session():
-	""" Starts an interactive sesion """
-	__COMS = {
-		"show_all_ports" : get_portfolios
-	}
 	user = {
 		"Email" : raw_input("Email > "),
 		"Passwd" : getpass("Password > "),
@@ -125,27 +123,10 @@ def session():
 	import time
 	p_name = "Testing_"+str(time.time())
 	user = make_portfolio(user, p_name, "USD")
-	delete_portfolio(user, p_name)
-
-	while 0:
-		user_input = raw_input("> ")
-		print "received \"{}\"".format(user_input)
-
-		comargs = user_input.split(' ', 1)
-		if len(comargs) > 1:
-			com, args = comargs
-		else:
-			com, args = comargs[0], None
-		
-		if args:
-			args = args.split(' ')
-
-		for name, func in __COMS.iteritems():
-			if com.lower().strip() == name.lower().strip():
-				func(args, user=user)
-		if com == 'q':
-			print "Done."
-			break
+	user = delete_portfolio(user, p_name)
+	for port_title in user['portfolios']:
+		if port_title != "My Portfolio":
+			user = delete_portfolio(user, port_title)
 
 if __name__=="__main__":
 	session()

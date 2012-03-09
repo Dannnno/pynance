@@ -2,6 +2,96 @@ import requests
 import json
 from getpass import getpass
 
+def parse_portfolio(entry):
+	""" Given a blob of JSON data that describes a portfolio, return
+		a dictionary with the important data. """
+	portfolio = {
+		'title' : entry['title']['$t'],
+		'updated' : entry['updated']['$t'],
+		'id' : entry['id']['$t'],
+		'etag' : entry['gd$etag'],
+		'link' : entry['link'][1]['href'],
+		'feedLink' : entry['gd$feedLink']['href'],
+		'portfolioData' : {},
+		'positions' : {}
+	}
+	portfolio['portfolioData'].update(entry['gf$portfolioData'])
+	for key in portfolio['portfolioData']:
+		if key != "currencyCode":
+			portfolio['portfolioData'][key] = float(portfolio['portfolioData'][key])
+	return portfolio
+
+class FinanceSession():
+	def __init__(self, username, password):
+		self.Auth = None
+		self.service = "finance"
+		self.source = "peterldowns-pynance-1.0"
+		self.email = username
+		self.passwd = password
+		self.headers = {
+			'GData-Version' : '2',
+			'content-type':'application/x-www-form-urlencoded',
+		}
+		self.portfolios = {}
+		#self.positions = {}
+		#self.transactions = {}
+		
+		self.login() # Authenticate to begin the session
+
+	def login(self):
+		""" Begin a session and retrieve a GoogleAuth key for later use.
+			A user must have this key to perform any other operation. """
+		print "Authenticating ..."
+		target = "https://www.google.com/accounts/ClientLogin"
+		payload = {
+			"Email" : self.email,
+			"Passwd" : self.passwd,
+			"service" : self.service,
+			"source" : self.source
+		}
+		response = requests.post(target, data=payload, headers=self.headers)
+		if login_resp.status_code == 200:
+			SID, LSID, Auth = map(lambda x:x.split('=')[1], login_resp.content.split('\n')[0:3])
+			self.Auth = Auth
+			self.headers["Authorization"] = ("GoogleLogin auth="+Auth)
+			print "... successful!"
+			return True
+		else:
+			#TODO: raise exception?
+			print "... failed. Please retry."
+			return False
+	
+	def get_portfolios(self):
+		""" Retrieve a list of all of a user's portfolios. """
+		if not self.Auth:
+			print "Not authenticated!"
+			return False
+
+		target = "https://finance.google.com/finance/feeds/default/portfolios?alt=json"
+		response = requests.get(target, headers=self.headers)
+		if not response.status_code == 200:
+			print "Error! Response status code = {}".format(response.status_code)
+			return False
+		else:
+			resp_data = json.loads(response.content)
+			feed = resp_data['feed']
+			entries = feed['entry']
+			for entry in entries:
+				port = parse_portfolio(entry)
+				self.portfolios[port['title']] = port
+			return True
+	
+	def show_portfolios(self):
+		""" Prints out a list of the user's portfolios """
+		if not self.portfolios:
+			self.get_portfolios()
+		print "Portfolios:"
+		print "-----------"
+		for p in self.portfolios:
+			print_portfolio(p)
+		print "-----------"
+
+
 def login(user):
 	""" Logs a user in and returns the auth keys """
 

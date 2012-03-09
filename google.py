@@ -19,9 +19,11 @@ def parse_portfolio(entry):
 	for key in portfolio['portfolioData']:
 		if key != "currencyCode":
 			portfolio['portfolioData'][key] = float(portfolio['portfolioData'][key])
+	#print json.dumps(portfolio, sort_keys=True, indent=4)
 	return portfolio
 def print_portfolio(portData):
 	""" Given a portfolio dict, print it out nice and pretty."""
+	#print json.dumps(portData, sort_keys=True, indent=4)
 	print "{}:\n  Last Updated: {}\n  Link to feed: {}".format(portData['title'], portData['updated'], portData['link'])
 	for k, v in portData['portfolioData'].iteritems():
 		print "    {} = {}".format(k, v)
@@ -83,8 +85,8 @@ class FinanceSession():
 			"source" : self.source
 		}
 		response = requests.post(target, data=payload, headers=self.headers)
-		if login_resp.status_code == 200:
-			SID, LSID, Auth = map(lambda x:x.split('=')[1], login_resp.content.split('\n')[0:3])
+		if response.status_code == 200:
+			SID, LSID, Auth = map(lambda x:x.split('=')[1], response.content.split('\n')[0:3])
 			self.Auth = Auth
 			self.headers["Authorization"] = ("GoogleLogin auth="+Auth)
 			print "... successful!"
@@ -120,12 +122,16 @@ class FinanceSession():
 			self.get_portfolios()
 		print "Portfolios:"
 		print "-----------"
-		for p in self.portfolios:
-			print_portfolio(p)
+		for title, port in self.portfolios.iteritems():
+			print_portfolio(port)
 		print "-----------"
 	
 	def create_portfolio(self, title, currencyCode):
 		""" Create a new portfolio with a given title and base currency. """
+		if not self.Auth:
+			print "Not authenticated!"
+			return False
+
 		cc = currencyCode.upper()
 		if len(cc) != 3:
 			print "Currency code must be 3 characters. You supplied: {}".format(currencyCode)
@@ -143,7 +149,7 @@ class FinanceSession():
 					"</entry>".format(title, cc)
 		target = "https://finance.google.com/finance/feeds/default/portfolios?alt=json"
 		
-		_headers = user['headers']
+		_headers = self.headers
 		_headers['content-type'] = 'application/atom+xml' # must change content type; posting XML
 
 		r = requests.post(target, headers=_headers, data=pf_entry)
@@ -161,6 +167,10 @@ class FinanceSession():
 	
 	def delete_portfolio(self, title):
 		""" If a portfolio with the given title currently exists: delete it. """
+		if not self.Auth:
+			print "Not authenticated!"
+			return False
+
 		if title in self.portfolios:
 			r = requests.delete(self.portfolios[title]['link'], headers=self.headers)
 			if r.status_code == 200:
@@ -177,8 +187,12 @@ class FinanceSession():
 
 	def get_positions(self, port_title):
 		""" Get all of the current positions of a given portfolio. """
-		if title in self.portfolios:
-			pf = self.portfolios[title]
+		if not self.Auth:
+			print "Not authenticated!"
+			return False
+
+		if port_title in self.portfolios:
+			pf = self.portfolios[port_title]
 			target = "{}?alt=json".format(pf['feedLink'])
 			r = requests.get(target, headers=self.headers)
 			if r.status_code == 200:
@@ -188,7 +202,7 @@ class FinanceSession():
 				for entry in entries:
 					position = parse_position(entry)
 					pf['positions'][position['title']] = position
-					self.portfolios[title] = pf # unnecessary? not sure if pf is a reference or copy
+					self.portfolios[port_title] = pf # unnecessary? not sure if pf is a reference or copy
 				#TODO: print success?
 				return True
 			else:
@@ -207,187 +221,27 @@ class FinanceSession():
 		if not self.portfolios[port_title]['positions']:
 			self.get_positions(port_title)
 		
-		for pos in self.portfolios[port_title]['positions']:
-			print "Portfolio: {}".format(port_title)
-			print "Positions:"
-			print "-----------"
-			for p in self.portfolios:
-				print_position(p)
-			print "-----------"
+		print "Portfolio: {}".format(port_title)
+		print "Positions:"
+		print "-----------"
+		for title, pos in self.portfolios[port_title]['positions'].iteritems():
+			print_position(pos)
+		print "-----------"
 
-
-def login(user):
-	""" Logs a user in and returns the auth keys """
-
-	login_target = "https://www.google.com/accounts/ClientLogin"
-	login_payload = {
-		"Email" : user['Email'],
-		"Passwd" : user['Passwd'],
-		"service" : user['service'],
-		"source" : user['source'],
-	}
-	login_headers = user['headers']
-	login_resp = requests.post(login_target, data=login_payload, headers=login_headers)
-
-	if login_resp.status_code == 200:
-		SID, LSID, Auth = map(lambda x:x.split('=')[1], login_resp.content.split('\n')[0:3])
-		user["Auth"] = Auth
-		user["headers"]["Authorization"] = ("GoogleLogin auth="+Auth)
-	return user
-
-def make_portfolio(user, title, currencyCode):
-	""" Create a new portfolio with a given title and currency. """
-	port_str = "<entry xmlns='http://www.w3.org/2005/Atom' "\
-					"xmlns:gf='http://schemas.google.com/finance/2007'> "\
-		  			"<title>{}</title> "\
-		    		"<gf:portfolioData currencyCode='{}'/> "\
-				"</entry>"
-	port_str = port_str.format(title, currencyCode)
-	
-	headers = user['headers']
-	headers['content-type'] = 'application/atom+xml'
-
-	r = requests.post("https://finance.google.com/finance/feeds/default/portfolios?alt=json", headers=headers, data=port_str)
-	if r.status_code != 201:
-		print "THERE WAS A SERIOUS ERROR. THIS IS NOT A JOKE. YOUR PORTFOLIO WAS NOT CREATED"
-		print "... please take me seriously?"
-		return user
-	
-	resp_data = json.loads(r.content)
-	new_portfolio = make_port_from_entry(resp_data['entry'])
-	user['portfolios'][new_portfolio['title']] = new_portfolio
-	print "Portfolio created."
-	print_portfolio(new_portfolio)
-	
-	return user
-
-def delete_portfolio(user, title):
-	""" Delete a portfolio given its title. If the portfolio doesn't exist,
-		show an error message and then continue anyway."""
-	if title in user['portfolios']:
-		r = requests.delete(user['portfolios'][title]['link'], headers=user['headers'])
-		if r.status_code == 200:
-			print "Successfully deleted portfolio: {}".format(title)
-			del user['portfolios'][title]
-		else:
-			print "Wasn't able to delete '{}' due to some auth/header error, probably. Idk.".format(title)
-	else: print "Unable to successfully delete portfolio: {}".format(title)
-	return user
-
-def make_port_from_entry(entry):
-	"""Given a JSON entry from the google API, create a portfolio object"""
-
-	portData = {
-		'title' : entry['title']['$t'],
-		'updated' : entry['updated']['$t'],
-		'id' : entry['id']['$t'],
-		'etag' : entry['gd$etag'],
-		'link' : entry['link'][1]['href'],
-		'feedLink' : entry['gd$feedLink']['href'],
-		'portfolioData' : {},
-		'positions' : {}
-	}
-	portData['portfolioData'].update(entry['gf$portfolioData'])
-	for key in portData['portfolioData']:
-		if key != "currencyCode":
-			portData['portfolioData'][key] = float(portData['portfolioData'][key])
-	return portData
-
-def get_portfolios(user):
-	""" Retrieve a list of all of a user's portfolios. Print them out,
-		giving short summaries of each, and store this data to the user
-		dict that is being passed around this program. """
-
-	reqstr = "https://finance.google.com/finance/feeds/default/portfolios?alt=json"
-	if not user or not user['Auth']:
-		print "Not authenticated!"
-		return
-	
-	r = requests.get(reqstr, headers=user['headers'])
-	resp_data = json.loads(r.content)
-	feed = resp_data['feed']
-	entries = feed['entry']
-	
-	for entry in entries:
-		#print json.dumps(entry, sort_keys=True, indent=4)
-		portData = make_port_from_entry(entry)
-		user['portfolios'][portData['title']] = portData
-		print_portfolio(portData)
-	return user
-
-def make_pos_from_entry(entry):
-	""" Given a JSON position entry, create a position dict"""
-	posData = {
-		'id' : entry['id']['$t'],
-		'updated' : entry['updated']['$t'],
-		'title' : entry['title']['$t'],
-		'link' : entry['link'][0]['href'],
-		'feedLink' : entry['gd$feedLink']['href'],
-		'symbol' : entry['gf$symbol']['symbol'],
-		'exchange': entry['gf$symbol']['exchange'],
-		'fullName' : entry['gf$symbol']['fullName'],
-		'positionData' : {},
-		'transactions' : {}
-	}
-	posData['positionData'].update(entry['gf$positionData'])
-	for key in posData['positionData']:
-		posData['positionData'][key] = float(posData['positionData'][key])
-	return posData
-
-def view_positions(user, port_title):
-	""" Get all of the current positions of a given portfolio"""
-	if not port_title in user['portfolios']:
-		print "Portfolio '{}' does not exist".format(port_title)
-	pos_str = "{}?alt=json".format(user['portfolios'][port_title]['feedLink'])
-	r = requests.get(pos_str, headers=user['headers'])
-	if r.status_code != 200:
-		print "serious error here: r.status_code = {}".format(r.status_code)
-		print "This is clearly not working, goodbye"
-		return user
-	pos_resp = json.loads(r.content)
-	feed = pos_resp['feed']
-	entries = feed['entry']
-	for entry in entries:
-		posData = make_pos_from_entry(entry)
-		user['portfolios'][port_title]['positions'][posData['title']] = posData
-		print_position(posData)
-	return user
-
-
-
-def session():
-	user = {
-		"Email" : raw_input("Email > "),
-		"Passwd" : getpass("Password > "),
-		"service" : "finance",
-		"source" : "downsEllisTrainer-autoStock-1.0",
-		"Auth" : None,
-		"portfolios" : {},
-		"headers" : {
-			"GData-Version" : "2",
-			'content-type':'application/x-www-form-urlencoded',
-		}
-	}
-	print "Attempting to authenticate..."
-	user = login(user)
-	if not user['Auth']:
-		print "... failure."
-		return
-	else:
-		print "... success."
-		print "Waiting for commands."
-	
-	user = get_portfolios(user)
+def test_session():
+	fs = FinanceSession(raw_input("Email: "), getpass("Password: "))
+	fs.get_portfolios()
+	fs.show_portfolios()
 	import time
-	p_name = "Testing_"+str(time.time())
-	user = make_portfolio(user, p_name, "USD")
-	user = delete_portfolio(user, p_name)
-	for port_title in user['portfolios'].keys():
-		if port_title != "My Portfolio":
-			user = delete_portfolio(user, port_title)
-	user = get_portfolios(user)
-	for port_title in user['portfolios']:
-		view_positions(user, port_title)
+	p_name = "Testing (FS) "+str(time.time())
+	fs.create_portfolio(p_name, "USD")
+	fs.show_portfolios()
+	fs.delete_portfolio(p_name)
+	for pf in fs.portfolios:
+		fs.show_positions(pf)
+	
+	print "................"
+	print "Done."
 
 if __name__=="__main__":
-	session()
+	test_session()

@@ -3,8 +3,8 @@ import json
 from getpass import getpass
 
 def parse_portfolio(entry):
-	""" Given a blob of JSON data that describes a portfolio, return
-		a dictionary with the important data. """
+	""" Given a blob of JSON data (as a dict) that describes a portfolio,
+		return a dictionary with the important data. """
 	portfolio = {
 		'title' : entry['title']['$t'],
 		'updated' : entry['updated']['$t'],
@@ -20,6 +20,26 @@ def parse_portfolio(entry):
 		if key != "currencyCode":
 			portfolio['portfolioData'][key] = float(portfolio['portfolioData'][key])
 	return portfolio
+
+def parse_position(entry):
+	""" Given a blob of JSON data (as a dict) that descibres a position,
+		return a dictionary with the important data. """
+	position = {
+		'id' : entry['id']['$t'],
+		'updated' : entry['updated']['$t'],
+		'title' : entry['title']['$t'],
+		'link' : entry['link'][0]['href'],
+		'feedLink' : entry['gd$feedLink']['href'],
+		'symbol' : entry['gf$symbol']['symbol'],
+		'exchange': entry['gf$symbol']['exchange'],
+		'fullName' : entry['gf$symbol']['fullName'],
+		'positionData' : {},
+		'transactions' : {}
+	}
+	position['positionData'].update(entry['gf$positionData'])
+	for key in position['positionData']:
+		position['positionData'][key] = float(position['positionData'][key])
+	return position
 
 class FinanceSession():
 	def __init__(self, username, password):
@@ -125,6 +145,7 @@ class FinanceSession():
 		print "Created new portfolio: {} (currency: {})".format(title, cc)
 		#print_portfolio(new_portfolio)
 		return True
+	
 	def delete_portfolio(self, title):
 		""" If a portfolio with the given title currently exists: delete it. """
 		if title in self.portfolios:
@@ -135,17 +156,35 @@ class FinanceSession():
 				return True
 			else:
 				print "Unable to delete portfolio '{}' due to a request or server error.".format(title)
-				print "Status code: {}\nServer resp: {}\n".format(r.status_code, r.content)
-			else:
+				print "Status code: {}\nServer resp: {}".format(r.status_code, r.content)
 		else:
 			print "Portfolio '{}' does not exist.".format(title)
 			print "Deletion failed."
-		
 		return False
 
-
-		
-
+	def get_positions(self, port_title):
+		""" Get all of the current positions of a given portfolio. """
+		if title in self.portfolios:
+			pf = self.portfolios[title]
+			target = "{}?alt=json".format(pf['feedLink'])
+			r = requests.get(target, headers=self.headers)
+			if r.status_code == 200:
+				pos_resp = json.loads(r.content)
+				feed = pos_resp['feed']
+				entries = feed['entry']
+				for entry in entries:
+					position = parse_position(entry)
+					pf['positions'][position['title']] = position
+					self.portfolios[title] = pf # unnecessary? not sure if pf is a reference or copy
+				#TODO: print success?
+				return True
+			else:
+				print "Unable to fetch positions for portfolio '{}'".format(port_title)
+				print "Status code: {}\nServer resp: {}".format(r.status_code, r.content)
+		else:
+			print "Portfolio '{}' does not exist.".format(title)
+			print "Unable to fetch positions for nonexistent portfolio"
+		return False
 
 
 def login(user):

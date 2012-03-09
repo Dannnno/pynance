@@ -90,6 +90,43 @@ class FinanceSession():
 		for p in self.portfolios:
 			print_portfolio(p)
 		print "-----------"
+	
+	def create_portfolio(self, title, currencyCode):
+		""" Create a new portfolio with a given title and base currency. """
+		cc = currencyCode.upper()
+		if len(cc) != 3:
+			print "Currency code must be 3 characters. You supplied: {}".format(currencyCode)
+			print "Portfolio creation failed."
+			return False
+		if not title: # title=="", title=None
+			print "Must supply a title."
+			print "Portfolio creation failed."
+			return False
+		
+		pf_entry = "<entry xmlns='http://www.w3.org/2005/Atom' "\
+						"xmlns:gf='http://schemas.google.com/finance/2007'> "\
+						"<title>{}</title> "\
+						"<gf:portfolioData currencyCode='{}'/> "\
+					"</entry>".format(title, cc)
+		target = "https://finance.google.com/finance/feeds/default/portfolios?alt=json"
+		
+		_headers = user['headers']
+		_headers['content-type'] = 'application/atom+xml' # must change content type; posting XML
+
+		r = requests.post(target, headers=_headers, data=pf_entry)
+		if r.status_code != 201:
+			print "Unable to create portfolio {} (currency: {})".format(title, cc)
+			print "Server returned:", r.content
+			return False
+		
+		resp_data = json.loads(r.content)
+		new_portfolio = parse_portfolio(resp_data['entry'])
+		self.portfolios[new_portfolio['title']] = new_portfolio
+		print "Created new portfolio: {} (currency: {})".format(title, cc)
+		#print_portfolio(new_portfolio)
+		return True
+		
+
 
 
 def login(user):

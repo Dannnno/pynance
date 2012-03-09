@@ -10,12 +10,13 @@ sample usage:
 529.46
 '''
 import urllib
+import traceback
 from operator import itemgetter
-from ultrafinance.lib.dataType import StockDailyType
-from ultrafinance.lib.errors import ufException, Errors
+from ultrafinance.model import Quote
+from ultrafinance.lib.errors import UfException, Errors
 
 import logging
-LOG = logging.getLogger(__name__)
+LOG = logging.getLogger()
 
 class YahooFinance(object):
     def __request(self, symbol, stat):
@@ -23,11 +24,11 @@ class YahooFinance(object):
             url = 'http://finance.yahoo.com/d/quotes.csv?s=%s&f=%s' % (symbol, stat)
             return urllib.urlopen(url).read().strip().strip('"')
         except IOError:
-            raise ufException(Errors.NETWORK_ERROR, "Can't connect to Yahoo server")
-        except BaseException as excep:
-            raise ufException(Errors.UNKNOWN_ERROR, "Unknown Error in YahooFinance.__request %s" % excep)
+            raise UfException(Errors.NETWORK_ERROR, "Can't connect to Yahoo server")
+        except BaseException:
+            raise UfException(Errors.UNKNOWN_ERROR, "Unknown Error in YahooFinance.__request %s" % traceback.format_exc())
 
-    def get_all(self, symbol):
+    def getAll(self, symbol):
         """
         Get all available quote data for the given ticker symbol.
         Returns a dictionary.
@@ -56,67 +57,7 @@ class YahooFinance(object):
         data['short_ratio'] = values[19]
         return data
 
-    def get_price(self, symbol):
-        return self.__request(symbol, 'l1')
-
-    def get_change(self, symbol):
-        return self.__request(symbol, 'c1')
-
-    def get_volume(self, symbol):
-        return self.__request(symbol, 'v')
-
-    def get_avg_daily_volume(self, symbol):
-        return self.__request(symbol, 'a2')
-
-    def get_stock_exchange(self, symbol):
-        return self.__request(symbol, 'x')
-
-    def get_market_cap(self, symbol):
-        return self.__request(symbol, 'j1')
-
-    def get_book_value(self, symbol):
-        return self.__request(symbol, 'b4')
-
-    def get_ebitda(self, symbol):
-        return self.__request(symbol, 'j4')
-
-    def get_dividend_per_share(self, symbol):
-        return self.__request(symbol, 'd')
-
-    def get_dividend_yield(self, symbol):
-        return self.__request(symbol, 'y')
-
-    def get_earnings_per_share(self, symbol):
-        return self.__request(symbol, 'e')
-
-    def get_52_week_high(self, symbol):
-        return self.__request(symbol, 'k')
-
-    def get_52_week_low(self, symbol):
-        return self.__request(symbol, 'j')
-
-    def get_50day_moving_avg(self, symbol):
-        return self.__request(symbol, 'm3')
-
-    def get_200day_moving_avg(self, symbol):
-        return self.__request(symbol, 'm4')
-
-    def get_price_earnings_ratio(self, symbol):
-        return self.__request(symbol, 'r')
-
-    def get_price_earnings_growth_ratio(self, symbol):
-        return self.__request(symbol, 'r5')
-
-    def get_price_sales_ratio(self, symbol):
-        return self.__request(symbol, 'p5')
-
-    def get_price_book_ratio(self, symbol):
-        return self.__request(symbol, 'p6')
-
-    def get_short_ratio(self, symbol):
-        return self.__request(symbol, 's7')
-
-    def get_historical_prices(self, symbol, start_date, end_date):
+    def getQuotes(self, symbol, start, end):
         """
         Get historical prices for the given ticker symbol.
         Date format is 'YYYY-MM-DD'
@@ -124,17 +65,17 @@ class YahooFinance(object):
         Returns a nested list.
         """
         try:
-            start_date = str(start_date).replace('-', '')
-            end_date = str(end_date).replace('-', '')
+            start = str(start).replace('-', '')
+            end = str(end).replace('-', '')
 
             url = 'http://ichart.yahoo.com/table.csv?s=%s&' % symbol + \
-                'd=%s&' % str(int(end_date[4:6]) - 1) + \
-                'e=%s&' % str(int(end_date[6:8])) + \
-                'f=%s&' % str(int(end_date[0:4])) + \
+                'd=%s&' % str(int(end[4:6]) - 1) + \
+                'e=%s&' % str(int(end[6:8])) + \
+                'f=%s&' % str(int(end[0:4])) + \
                 'g=d&' + \
-                'a=%s&' % str(int(start_date[4:6]) - 1) + \
-                'b=%s&' % str(int(start_date[6:8])) + \
-                'c=%s&' % str(int(start_date[0:4])) + \
+                'a=%s&' % str(int(start[4:6]) - 1) + \
+                'b=%s&' % str(int(start[6:8])) + \
+                'c=%s&' % str(int(start[0:4])) + \
                 'ignore=.csv'
             days = urllib.urlopen(url).readlines()
             values = [day[:-2].split(',') for day in days]
@@ -142,14 +83,14 @@ class YahooFinance(object):
             #              ['2009-12-31', '112.77', '112.80', '111.39', '111.44', '90637900', '109.7']...]
             data = []
             for value in values[1:]:
-                data.append(StockDailyType(value[0], value[1], value[2], value[3], value[4], value[5], value[6]))
+                data.append(Quote(value[0], value[1], value[2], value[3], value[4], value[5], value[6]))
 
             dateValues = sorted(data, key=itemgetter(0))
             return dateValues
 
         except IOError:
-            raise ufException(Errors.NETWORK_ERROR, "Can't connect to Yahoo server")
-        except BaseException as excep:
-            raise ufException(Errors.UNKNOWN_ERROR, "Unknown Error in YahooFinance.get_historical_prices %s" % excep)
+            raise UfException(Errors.NETWORK_ERROR, "Can't connect to Yahoo server")
+        except BaseException:
+            raise UfException(Errors.UNKNOWN_ERROR, "Unknown Error in YahooFinance.getHistoricalPrices %s" % traceback.format_exc())
         #sample output
         #[stockDaylyData(date='2010-01-04, open='112.37', high='113.39', low='111.51', close='113.33', volume='118944600', adjClose='111.6'))...]

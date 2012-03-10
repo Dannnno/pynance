@@ -1,6 +1,7 @@
 import requests
 import json
 from getpass import getpass
+import time
 
 def parse_portfolio(entry):
 	""" Given a blob of JSON data (as a dict) that describes a portfolio,
@@ -138,7 +139,7 @@ class FinanceSession():
 			print_portfolio(port)
 		print "-----------"
 	
-	def create_portfolio(self, title, currencyCode):
+	def create_portfolio(self, title, currencyCode="USD"):
 		""" Create a new portfolio with a given title and base currency. """
 		if not self.Auth:
 			print "Not authenticated!"
@@ -196,13 +197,13 @@ class FinanceSession():
 			print "Deletion failed."
 		return False
 
-	def get_positions(self, port_title):
+	def get_positions(self, pftitle):
 		""" Get all of the current positions of a given portfolio. """
 		if not self.Auth:
 			print "Not authenticated!"
 			return False
-		if port_title in self.portfolios:
-			pf = self.portfolios[port_title]
+		if pftitle in self.portfolios:
+			pf = self.portfolios[pftitle]
 			target = "{}?alt=json".format(pf['feedLink'])
 			r = requests.get(target, headers=self.headers)
 			if r.status_code == 200:
@@ -214,33 +215,33 @@ class FinanceSession():
 				for entry in entries:
 					position = parse_position(entry)
 					pf['positions'][position['symbol']] = position
-					self.portfolios[port_title] = pf # unnecessary? not sure if pf is a reference or copy
+					self.portfolios[pftitle] = pf # unnecessary? not sure if pf is a reference or copy
 				#TODO: print success?
 				return True
 			else:
-				print "Unable to fetch positions for portfolio '{}'".format(port_title)
+				print "Unable to fetch positions for portfolio '{}'".format(pftitle)
 				print "Status code: {}\nServer resp: {}".format(r.status_code, r.content)
 		else:
-			print "Portfolio '{}' does not exist.".format(port_title)
+			print "Portfolio '{}' does not exist.".format(pftitle)
 			print "Unable to fetch positions for nonexistent portfolio"
 		return False
 	
-	def show_positions(self, port_title):
+	def show_positions(self, pftitle):
 		""" For a given portfolio, show all of the positions held within it. """
-		if not self.portfolios[port_title]:
-			print "Portfolio '{}' does not exist.".format(port_title)
+		if not self.portfolios[pftitle]:
+			print "Portfolio '{}' does not exist.".format(pftitle)
 			return False
-		if not self.portfolios[port_title]['positions']:
-			self.get_positions(port_title)
+		if not self.portfolios[pftitle]['positions']:
+			self.get_positions(pftitle)
 		
-		print "Portfolio: {}".format(port_title)
+		print "Portfolio: {}".format(pftitle)
 		print "Positions:"
 		print "-----------"
-		for title, pos in self.portfolios[port_title]['positions'].iteritems():
+		for title, pos in self.portfolios[pftitle]['positions'].iteritems():
 			print_position(pos)
 		print "-----------"
 
-	def get_position_data(self, port_title, symbol, exchange=None ):
+	def get_position_data(self, pftitle, symbol, exchange=None):
 		""" Gets data associated with a specific position in a given portfolio.
 			You must specify a symbol: e.g., 'AAPL' or 'NASDAQ:AAPL'. If preferred,
 			the exchange can be passed as its own argument: symbol='AAPL', exchange='NASDAQ'
@@ -248,16 +249,17 @@ class FinanceSession():
 		if not self.Auth:
 			print "Not authenticated!"
 			return False
-		if not port_title in self.portfolios:
-			print "Portfolio '{}' does not exist.".format(port_title)
+		if not pftitle in self.portfolios:
+			print "Portfolio '{}' does not exist.".format(pftitle)
 			print "Unable to fetch positions for nonexistent portfolio"
 			return False
+		# TODO: actually fetch position data?
 		symbol = symbol.upper()
 		if exchange:
 			exchange = exchange.upper()
-			matched_pos = [(name, data) for name, data in self.portfolios[port_title]['positions'].iteritems() if symbol == data['symbol'] and exchange == data['exchange']]
+			matched_pos = [(name, data) for name, data in self.portfolios[pftitle]['positions'].iteritems() if symbol == data['symbol'] and exchange == data['exchange']]
 		else:
-			matched_pos = [(name, data) for name, data in self.portfolios[port_title]['positions'].iteritems() if symbol == data['symbol']]
+			matched_pos = [(name, data) for name, data in self.portfolios[pftitle]['positions'].iteritems() if symbol == data['symbol']]
 		matched_pos = dict(matched_pos)
 	
 		print "{} positions found for symbol {} on {} exchange".format(len(matched_pos), symbol, exchange if exchange else "any")
@@ -265,7 +267,54 @@ class FinanceSession():
 			print_position(pos)
 		return True
 
-				
+	#def get_transactions(self, pftitle, symbol, exchange=None):
+		#""" Gets a list of transactions for a specific position/symbol. """
+		#symbol = symbol.upper()
+		#if exchange: exchange = exchange.upper()
+		#if not self.Auth:
+			#print "Not authenticated!"
+			#return False
+		#if not pftitle in self.portfolios:
+			#print "Portfolio '{}' does not exist.".format(pftitle)
+			#print "Unable to fetch transaction data for nonexistent portfolio"
+			#return False
+		#if not exchange in self.portfolios['pftitle']:
+			#print "Portfolio '{}' has no positions on {} (on {} exchange)".format(pftitle, symbol, exchange if exchange else "any")
+			#print "Unable to fetch transaction data for nonexistent position"
+	
+	def buy(self, pftitle, symbol, shares, pps, commission=None, cc="USD", ts=None):
+		""" Purchase shares of a stock and add them to a portfolio. """
+		return self.mk_transaction("Buy", pftitle, symbol, shares, pps, commission=None, cc="USD", ts=None)
+
+	def mk_transaction(self, transaction_type, pftitle, symbol, shares, pps, commission=None, cc="USD", ts=None):
+		#TODO: add error checking here
+
+		timestamp = ts if ts else time.strftime("%Y-%m-%dT%H:%M%S", time.gmtime()) # optional passed in time
+		if not commission:
+			commission = 0.0
+		entry = "<entry>"\
+		  			"<gf:transactionData date='{timestamp}' "\
+							"shares='{shares}' type='{tt}'>"\
+		      			"<gf:commission>"\
+			        		"<gd:money amount='{commission}' currencyCode='{cur_code}'/>"\
+					    "</gf:commission>"\
+						"<gf:price>"\
+							"<gd:money amount='{price}' currencyCode='{cur_code}'/>"\
+						"</gf:price>"\
+					"</gf:transactionData>"\
+				"</entry>"
+		entry = entry.format(timestamp=timestamp, shares=float(shares),
+					cur_code=cc.upper(), commission=float(commission),
+					price=float(pps), tt=transaction_type)
+
+		_headers = self.headers
+		_headers['content-type'] = 'application/atom+xml' # must change content type; posting XML
+
+		target = self.portfolios[pftitle][symbol]['feedLink']
+
+		
+
+
 
 
 
@@ -278,7 +327,6 @@ def test_session():
 	fs.get_portfolios()
 	fs.show_portfolios()
 	
-	import time
 	p_name = "Testing (FS) "+str(time.time())
 	fs.create_portfolio(p_name, "USD")
 	

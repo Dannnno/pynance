@@ -3,6 +3,9 @@ import json
 from getpass import getpass
 import time
 
+def pprint(jdata):
+	print json.dumps(jdata, indent=4, sort_keys=True)
+
 def parse_portfolio(entry):
 	""" Given a blob of JSON data (as a dict) that describes a portfolio,
 		return a dictionary with the important data. """
@@ -308,28 +311,23 @@ class FinanceSession():
 					cur_code=cc.upper(), commission=float(commission),
 					price=float(pps), tt=transaction_type)
 
-		print entry
 		_headers = self.headers
 		_headers['content-type'] = 'application/atom+xml' # must change content type; posting XML
-		print _headers
 
 		target = "{}?alt=json"
 		if symbol in self.portfolios[pftitle]:
-			print "found a target!"
 			target = target.format(self.portfolios[pftitle][symbol]['feedLink'])
 		else:
 			target = self.portfolios[pftitle]['id']+"/positions/"+symbol+"/transactions?alt=json"
-		print "!!!target =", target
 		response = requests.post(target, headers=_headers, data=entry)
 		if not response.status_code == 201:
 			print "Error! Response status code = {}".format(response.status_code)
-			print response
-			print response.content
 			return False
 		else:
 			print "Created!"
 			print response.content
-			#resp_data = json.loads(response.content)
+			resp_data = json.loads(response.content)
+			pprint(resp_data)
 			#feed = resp_data['feed']
 			#entries = feed['entry']
 			#for entry in entries:

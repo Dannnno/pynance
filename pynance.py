@@ -19,7 +19,7 @@ def parse_portfolio(entry):
 	# Gets extra portfolio data that are stored as specific gf$NAME entries
 	pred = lambda x: x[0:3]=="gf$"
 	for measurement in filter(pred, entry['gf$portfolioData']):
-		print "New Measurement: {}".format(measurement)
+		#print "New Measurement: {}".format(measurement)
 		list_of_values = entry['gf$portfolioData'][measurement]['gd$money']
 		mod_list = []
 		for value in list_of_values:
@@ -32,7 +32,6 @@ def parse_portfolio(entry):
 		if key != "currencyCode" and not pred(key):
 			portfolio['portfolioData'].update({key : float(value)})
 	return portfolio
-
 def print_portfolio(portData):
 	""" Given a portfolio dict, print it out nice and pretty."""
 	print "{}:\n  Last Updated: {}\n  Link to feed: {}".format(portData['title'], portData['updated'], portData['link'])
@@ -66,7 +65,6 @@ def print_position(posData):
 	print "  Link:", posData['link']
 	for k, v in posData['positionData'].iteritems():
 		print "    {} = {}".format(k, v)
-
 
 class FinanceSession():
 	def __init__(self, username, password):
@@ -124,7 +122,7 @@ class FinanceSession():
 			feed = resp_data['feed']
 			entries = feed['entry']
 			for entry in entries:
-				print json.dumps(entry, sort_keys=True, indent=4)
+				#print json.dumps(entry, sort_keys=True, indent=4)
 				port = parse_portfolio(entry)
 				self.portfolios[port['title']] = port
 			return True
@@ -289,10 +287,12 @@ class FinanceSession():
 	def mk_transaction(self, transaction_type, pftitle, symbol, shares, pps, commission=None, cc="USD", ts=None):
 		#TODO: add error checking here
 
-		timestamp = ts if ts else time.strftime("%Y-%m-%dT%H:%M%S", time.gmtime()) # optional passed in time
+		timestamp = ts if ts else time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()) # optional passed in time
 		if not commission:
 			commission = 0.0
-		entry = "<entry>"\
+		entry = "<entry xmlns='http://www.w3.org/2005/Atom' "\
+		    	       "xmlns:gf='http://schemas.google.com/finance/2007' "\
+					   "xmlns:gd='http://schemas.google.com/g/2005'>"\
 		  			"<gf:transactionData date='{timestamp}' "\
 							"shares='{shares}' type='{tt}'>"\
 		      			"<gf:commission>"\
@@ -302,39 +302,58 @@ class FinanceSession():
 							"<gd:money amount='{price}' currencyCode='{cur_code}'/>"\
 						"</gf:price>"\
 					"</gf:transactionData>"\
-				"</entry>"
+					"</entry>"
+		#entry = "<?xml version='1.0' encoding='UTF-8'?>" + entry
 		entry = entry.format(timestamp=timestamp, shares=float(shares),
 					cur_code=cc.upper(), commission=float(commission),
 					price=float(pps), tt=transaction_type)
 
+		print entry
 		_headers = self.headers
 		_headers['content-type'] = 'application/atom+xml' # must change content type; posting XML
+		print _headers
 
-		target = self.portfolios[pftitle][symbol]['feedLink']
-
-		
-
-
-
-
-
-
-
+		target = "{}?alt=json"
+		if symbol in self.portfolios[pftitle]:
+			print "found a target!"
+			target = target.format(self.portfolios[pftitle][symbol]['feedLink'])
+		else:
+			target = self.portfolios[pftitle]['id']+"/positions/"+symbol+"/transactions"
+		print "!!!target =", target
+		response = requests.post(target, headers=_headers, data=entry)
+		if not response.status_code == 201:
+			print "Error! Response status code = {}".format(response.status_code)
+			print response
+			print response.content
+			return False
+		else:
+			print "Created!"
+			print response.content
+			#resp_data = json.loads(response.content)
+			#feed = resp_data['feed']
+			#entries = feed['entry']
+			#for entry in entries:
+				#print json.dumps(entry, sort_keys=True, indent=4)
+				#port = parse_portfolio(entry)
+				#self.portfolios[port['title']] = port
+			#return True
 
 
 def test_session():
 	fs = FinanceSession(raw_input("Email: "), getpass("Password: "))
-	fs.get_portfolios()
-	fs.show_portfolios()
+	#fs.get_portfolios()
+	#fs.show_portfolios()
 	
-	p_name = "Testing (FS) "+str(time.time())
-	fs.create_portfolio(p_name, "USD")
+	#p_name = "Testing (FS) "+str(time.time())
+	#fs.create_portfolio(p_name, "USD")
 	
 	fs.show_portfolios()
-	for pf in fs.portfolios:
-		fs.show_positions(pf)
-	fs.get_position_data('My Portfolio', 'AAPL')
-	fs.get_position_data('My Portfolio', 'AAPL', exchange='NASDAQ')
+	#for pf in fs.portfolios:
+		#fs.show_positions(pf)
+	#fs.get_position_data('My Portfolio', 'AAPL')
+	#fs.get_position_data('My Portfolio', 'AAPL', exchange='NASDAQ')
+	fs.get_position_data('My Portfolio', 'GOOG')
+	fs.buy('My Portfolio', 'NASDAQ:GOOG', 500, 450.54, commission=None, cc="USD", ts=None)
 	fs.get_position_data('My Portfolio', 'GOOG')
 	
 	# cleanup

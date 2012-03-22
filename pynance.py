@@ -318,7 +318,7 @@ class FinanceSession():
 			print "found a target!"
 			target = target.format(self.portfolios[pftitle][symbol]['feedLink'])
 		else:
-			target = self.portfolios[pftitle]['id']+"/positions/"+symbol+"/transactions"
+			target = self.portfolios[pftitle]['id']+"/positions/"+symbol+"/transactions?alt=json"
 		print "!!!target =", target
 		response = requests.post(target, headers=_headers, data=entry)
 		if not response.status_code == 201:

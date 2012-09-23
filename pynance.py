@@ -285,7 +285,10 @@ class FinanceSession():
 	
 	def buy(self, pftitle, symbol, shares, pps, commission=None, cc="USD", ts=None):
 		""" Purchase shares of a stock and add them to a portfolio. """
-		return self.mk_transaction("Buy", pftitle, symbol, shares, pps, commission=None, cc="USD", ts=None)
+		return self.mk_transaction("Buy", pftitle, symbol, shares, pps, commission, cc, ts)
+	def sell(self, pftitle, symbol, shares, pps, commission=None, cc="USD", ts=None):
+		""" Sell shares of a stock and remove them from a portfolio. """
+		return self.mk_transaction("Sell", pftitle, symbol, shares, pps, commission, cc, ts)
 
 	def mk_transaction(self, transaction_type, pftitle, symbol, shares, pps, commission=None, cc="USD", ts=None):
 		#TODO: add error checking here
@@ -324,10 +327,9 @@ class FinanceSession():
 			print "Error! Response status code = {}".format(response.status_code)
 			return False
 		else:
-			print "Created!"
 			print response.content
 			resp_data = json.loads(response.content)
-			pprint(resp_data)
+			#pprint(resp_data)
 			#feed = resp_data['feed']
 			#entries = feed['entry']
 			#for entry in entries:
@@ -339,20 +341,25 @@ class FinanceSession():
 
 def test_session():
 	fs = FinanceSession(raw_input("Email: "), getpass("Password: "))
-	#fs.get_portfolios()
+	fs.get_portfolios()
 	#fs.show_portfolios()
 	
 	#p_name = "Testing (FS) "+str(time.time())
 	#fs.create_portfolio(p_name, "USD")
 	
-	fs.show_portfolios()
+	#fs.show_portfolios()
 	#for pf in fs.portfolios:
 		#fs.show_positions(pf)
 	#fs.get_position_data('My Portfolio', 'AAPL')
 	#fs.get_position_data('My Portfolio', 'AAPL', exchange='NASDAQ')
-	fs.get_position_data('My Portfolio', 'GOOG')
-	fs.buy('My Portfolio', 'NASDAQ:GOOG', 500, 450.54, commission=None, cc="USD", ts=None)
-	fs.get_position_data('My Portfolio', 'GOOG')
+	
+	fs.show_positions('My Portfolio')
+	
+	fs.buy('My Portfolio', 'NASDAQ:GOOG', 500, 450.54)
+	fs.show_positions('My Portfolio')
+	
+	fs.sell('My Portfolio', 'NASDAQ:GOOG', 500, 450.54)
+	fs.show_positions('My Portfolio')
 	
 	# cleanup
 	for pf in fs.portfolios.keys():
